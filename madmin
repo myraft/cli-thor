@@ -1,0 +1,145 @@
+#!/usr/local/bin/ruby
+
+## Midpoint CLI, Phase I
+#
+# Usage: ./madmin COMMAND [ARG]
+
+require 'rubygems'
+require 'thor'
+
+class Madmin < Thor  # Inherit from Thor to turn the class into an option mapper.
+
+  # Describe the method below. The first parameter is the usage information, and the second parameter is the description.
+  desc "list [dev|prod|all]", "Shows list of feeds, both development and production."
+  method_options :alias => :string
+  def list(type)
+    user_alias = options[:alias]
+    if type == "dev"
+      print "\nShowing feed list: development\n\n"
+      system "ls feeds/development/nipr/ && ls feeds/development/nipr/si2/mx/"
+    elsif type == "prod"
+      print "\nShowing feed list: production\n\n"
+      system "ls feeds/production/nipr/"
+    elsif type == "all"
+      print "\nShowing all feeds: \n\n"
+      system "ls feeds/development/nipr/ && ls feeds/development/nipr/si2/mx/ && ls feeds/production/nipr"
+    end
+  end
+
+  desc "status", "Shows midpoint status."
+  def status
+    puts "\nMidpoint status: \n\n"
+    system "if ps ax | grep -v grep | grep 'midpointd' > /dev/null 
+            then 
+              echo ' The Midpoint daemon is running.\n'
+            else
+              echo ' The Midpoint daemon is not running.\n'
+            fi
+            if ps ax | grep -v grep | grep 'run_feed' > /dev/null 
+            then 
+              echo ' Midpoint is running a feed.\n'
+            else
+              echo ' Midpoint is not running a feed.\n'
+            fi
+            if ps ax | grep -v grep | grep 'run_schedule' > /dev/null 
+            then 
+              echo ' Midpoint is running the scheduler.\n'
+            else
+              echo ' Midpoint is not running the scheduler.\n'
+            fi"
+  end
+
+  desc "modes", "Shows available modes to run a feed."
+  def modes
+    puts "Available Modes:\n default\n test_collection\n test_translation\n test_production\n collect_only\n to_pubs\n to_html\n run_validation\n getsampleinput\n getsampleoutput\n\n"
+  end
+
+  desc "config path_to_feed", "Shows the config for a feed."
+  method_options :alias => :string
+  def config(feed_path)
+    user_alias = options[:alias]
+    puts "\nShowing config for feed: " + feed_path + "\n\n"
+    system "bin/print_feed_config #{feed_path}/feed.yml"
+  end
+
+  desc "config_total path_to_feed", "Shows total config from all ancestors as well as from where each setting originated."
+  method_options :alias => :string
+  def config_total(feed_path)
+    user_alias = options[:alias]
+    puts "\nShowing total config for feed: " + feed_path + "\n\n"
+    system "bin/inspect_yaml #{feed_path}/feed.yml"
+    puts "\nShowing total config for feed: " + feed_path + "\n\n"
+  end
+
+  desc "schedule", "Shows the feed schedule."
+  def schedule
+    puts "Feed schedule:\n"
+    system "cat schedule.yml"
+  end
+
+  desc "running_feed", "Shows currently running feeds."
+  def running_feed
+    system "ps aux | grep -v grep | grep 'run_feed'"
+  end
+
+  desc "ran_feed", "Shows what feeds have run & which feeds need to run."
+  def ran_feed
+    system "bin/chk_last_run /var/spool/midpoint/schedule_state/"
+  end
+
+  desc "verify feedname", "Verify contents of tacball created by specified feed."
+  method_options :alias => :string
+  def verify(name)
+    user_alias = options[:alias]
+    puts "\nVerifying feed: " + name + "\n\n"
+    system "lz /var/spool/midpoint/dataout/#{name}/*"
+  end
+                  
+  desc "log feedname [info|warn|error|all]", "Show specific parts of a specified feed's log."
+  method_options :sections => :string, :alias => :string
+  def log(name, opts)
+    user_alias = options[:alias]
+    system = "clear"
+    puts "\nViewing log: " + name + " feed\n\n"
+    if opts == "info"
+      system "cat /var/log/midpoint/#{name}* | grep 'INFO'"
+      elsif opts == "warn"
+        system "cat /var/log/midpoint/#{name}* | grep 'WARN'"
+      elsif opts == "error"
+        system "cat /var/log/midpoint/#{name}* | grep 'ERROR'"
+      elsif opts == "all"
+        system "cat /var/log/midpoint/#{name}* | more"
+    end
+  end
+
+  desc "system_info", "Prints information about the host machine."
+  def system_info
+    system "uname -a && uptime && cat /proc/cpuinfo | grep 'processor' && cat /proc/cpuinfo | \
+            grep 'model name' && cat /proc/meminfo | grep 'MemTotal' && cat /proc/meminfo | grep 'MemFree' "
+  end
+
+  desc "version", "Prints the version of Midpoint."
+  def version
+    system "grep 'MIDPOINT_VERSION' setup_env.rb"
+  end
+
+  desc "usage", "Prints madmin command usage information."
+  def usage
+    puts " 
+           madmin config path_to_feed                 # Shows the config for a feed.
+           madmin config_total path_to_feed           # Shows total config from all ancestors as well as from where each setting originated.
+           madmin list [dev|prod|all]                 # Shows list of feeds, both development and production.
+           madmin log feedname [info|warn|error|all]  # Show specific parts of a specified feed's log.
+           madmin modes                               # Shows available modes to run a feed.
+           madmin ran_feed                            # Shows what feeds have run & which feeds need to run.
+           madmin running_feed                        # Shows currently running feeds.
+           madmin schedule                            # Shows the feed schedule.
+           madmin status                              # Shows midpoint status.
+           madmin system_info                         # Prints information about the host machine.
+           madmin usage                               # Prints madmin command usage information.
+           madmin verify feedname                     # Verify contents of tacball created by specified feed.
+           madmin version                             # Prints the version of Midpoint."
+  end
+
+end
+Madmin.start
